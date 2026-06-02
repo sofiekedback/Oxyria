@@ -1,2 +1,2 @@
 # Oxyria
-Code for thesis
+Code for thesis on Oxyria digyna
