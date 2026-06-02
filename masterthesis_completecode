@@ -1,0 +1,991 @@
+#R script for all code used for the master thesis "Different phylogenetic relationships within the genome of European Oxyria digyna"
+#Sofie Kedbäck
+#2026-03-04 to 2026-05-08
+#Not all results are included in the final thesis
+
+
+## 0. ESSENTIALS FOR REST OF CODE ####
+setwd("/Users/sofie/Documents/Göteborgs universitet/Master/Masterarbete/R/Master_RProject")
+
+# Download accordning to TreeMix manual
+source("/Users/sofie/Documents/Göteborgs universitet/Master/Masterarbete/TreeMix/treemix-1.13/src/plotting_funcs.R")
+
+# All packages used
+library(RColorBrewer)
+library(R.utils)
+library(ape)
+library(phangorn)
+library(phytools)
+
+#------------------------------------------------------------------------------#
+
+########################################################
+######### FOR THE CHROMOSOMES ##########################
+
+
+## 1. VISUALISE UNROOTED PHYLOGENIES ####
+## 1.1.1 VISUALISE TREES FROM TREEMIX OUTPUT ACCORDING TO TREEMIX MANUAL
+
+# Plot the chromosome tree (chromosome 1, m=0)
+plot_tree("Oxy_chr1_m0") # change name depending on chromosome and number of migration edges
+
+# Plot the core/accessory trees (accessory, fixed, iteration 0, m=0)
+plot_tree("Oxy_accessory_fixedtree_0_m0") 
+
+
+## 1.1.2 CREATE RESIDUAL PLOTS BASED ON THE TREEMIX MANUAL
+
+plot_resid("Oxy_chr7_m5", "poporder.txt") # poporder.txt" is a text document with population names
+
+
+## 1.2 ALTERNATIVE METHOD FROM THE TREEMIX WEBPAGE https://speciationgenomics.github.io/Treemix/
+
+#Prefix for the chromosome
+prefix="Oxy_chr1"
+
+# Load packages
+library(RColorBrewer)
+library(R.utils)
+
+# Visualise chromosome 1, m=0 to m=5 in the same figure
+par(mfrow=c(2,3))
+for(edge in 0:5){
+  plot_tree(cex=0.8,paste0(prefix,"_m",edge)) #changed "." to "_m" because of my file name
+  title(paste(edge,"edges"))
+}
+
+# Visualise resudial plots för chromosome 1, m=0 to m=5 in the same figure
+for(edge in 0:5){
+  plot_resid(stem=paste0(prefix,"_m",edge),pop_order="poporder.txt")
+}
+
+#------------------------------------------------------------------------------#
+## 2. FIND THE NUMBER OF MIGRATION EDGES NEEDED TO EXPLAIN THE DATA OF THE CHROMOSOMES ####
+# By using code from github by darencard https://github.com/darencard/RADpipe/blob/master/treemixVarianceExplained.R
+# Remade with AI (ChatGPT) to be able to run in R
+
+# Calculate the standard error in covariance matric and "variance of relatedness between populations explained by the model" 
+#args <- commandArgs(TRUE) # This only works in eg. powershell, so I changed to following
+args <- c("Oxy_accessory_50_m2") # Change name for chromosome and m value 
+
+calcVarExplain <- function(stem){
+  # read in two covariance matrices
+  WHat = read.table(gzfile(paste(stem, ".cov.gz", sep = "")), as.is = T, 
+                    head = T, quote = "", comment.char = "")
+  W = read.table(gzfile(paste(stem, ".modelcov.gz", sep = "")), as.is = T, 
+                 head = T, quote = "", comment.char = "")
+  
+  # set row and column names and order properly
+  names(WHat) = rownames(WHat)
+  names(W) = rownames(W)
+  WHat = WHat[order(names(WHat)), order(names(WHat))]
+  W = W[order(names(W)), order(names(W))]
+  
+  # calculate standard error of covariance matrix
+  se = read.table(gzfile(paste(stem, ".covse.gz", sep = "")), as.is = T, 
+                  head = T, quote = "", comment.char = "")
+  seBar = apply(se, 1, mean)
+  seBar = mean(seBar)
+  
+  # calculate residuals
+  R = WHat - W
+  
+  # set residual lower matrix triangle to NA
+  R[lower.tri(R, diag = TRUE)] <- NA
+  
+  # calculate mean residual across upper matrix triangle
+  RBar = mean(as.matrix(R), na.rm = TRUE)
+  
+  # set data-estimated W(hat) matrix lower matrix triangle to NA
+  WHat[lower.tri(WHat, diag = TRUE)] <- NA
+  
+  # calculate mean W(hat)
+  WHatBar = mean(as.matrix(WHat), na.rm = TRUE)
+  
+  # calculate numerator of equation 30
+  fNum = sum((R - RBar)^2, na.rm = TRUE)
+  
+  # calculate denominator of equation 30
+  fDen = sum((WHat - WHatBar)^2, na.rm = TRUE)
+  
+  # calculate f in equation 30
+  f = 1 - (fNum/fDen) #Jag tror detta är vad P och P förklarar
+  
+  outList = list("StdErr" = seBar, "VarExplain" = f)
+  return(outList)
+}
+
+# Create files with the output
+output <- calcVarExplain(args[1])
+
+if (length(args) == 2){
+  write(paste(paste0("Standard error for all entries in the covariance",
+                     "matrix estimated from the data"), 
+              output$StdErr, sep = "\t"), file = stderr())
+  
+  write(paste(paste0("Variance of relatedness between populations",
+                     "explained by the model"),
+              output$VarExplain, sep = "\t"), file = stderr())
+}
+
+write(paste(paste0("Standard error for all entries in the covariance ",
+                   "matrix estimated from the data"), 
+            output$StdErr, sep = "\t"), file = stdout())
+
+write(paste(paste0("Variance of relatedness between populations ",
+                   "explained by the model"),
+            output$VarExplain, sep = "\t"), file = stdout())
+
+
+#------------------------------------------------------------------------------#
+## 3. MIDPOINT ROOTING THE CHROMOSOME TREES ####
+# Using basic code together with AI (ChatGPT) code
+
+# Read in the tree (chromosome 1)
+
+# Load package
+#library(ape)
+
+# Read in nexus tree from treemix output (treeout.gz)
+phy_Ch1 <- read.tree(gzfile("Oxy_chr1_m0.treeout.gz"))
+
+# Midpoint rooting
+library(phytools)
+phy_rooted_Ch1 <- midpoint.root(phy_Ch1)
+
+# Plot midpoint rooted tree
+plot(phy_rooted)
+
+
+# Save the midpoint rooted tree file
+#library(ape)
+
+#In Newick format
+ape::write.tree(phy_rooted_Ch1, file='phy_rooted_ch1.txt') #Ch1
+
+#In nexus format
+ape::write.nexus(phy_rooted_Ch1, file='phy_rooted_ch1.nex') #Ch1
+
+#------------------------------------------------------------------------------#
+# 4. MIDPOINT ROOT ALL 7 CHROMOSOMES TO CREATE A CONSENSUS TREE WITH SUPPORT FOR THE MIDPOINT ROOT ####
+
+# Load packages
+#library(ape)
+#library(phytools)
+
+#png("Ch7_midpointrooted_support.png", width = 1000, height = 700, res = 150)
+#plot(phy_rooted_Ch7)
+#dev.off()
+#Read in the tree
+
+## 4.1 MIDPOINT ROOT CHROMOSOME 1 TO 7
+# By using Nexus file from TreeMix output (treeout.gz)
+# Chromosome 1 
+phy_Ch1 <- read.tree(gzfile("Oxy_chr1_m0.treeout.gz")) #treeout file works as "phylo"
+
+# midpoint rooting
+phy_rooted_Ch1 <- midpoint.root(phy_Ch1)
+
+# Plot rooted chromosome
+plot(phy_rooted_Ch1)
+
+# Chromosome 2
+phy_Ch2 <- read.tree(gzfile("Oxy_chr2_m0.treeout.gz")) #treeout file works as "phylo"
+phy_rooted_Ch2 <- midpoint.root(phy_Ch2)
+plot(phy_rooted_Ch2)
+
+# Chromosome 3
+phy_Ch3 <- read.tree(gzfile("Oxy_chr3_m0.treeout.gz"))
+phy_rooted_Ch3 <- midpoint.root(phy_Ch3)
+plot(phy_rooted_Ch3)
+
+# Chromosome 4
+phy_Ch4 <- read.tree(gzfile("Oxy_chr4_m0.treeout.gz"))
+phy_rooted_Ch4 <- midpoint.root(phy_Ch4)
+plot(phy_rooted_Ch4)
+
+# Chromosome 5
+phy_Ch5 <- read.tree(gzfile("Oxy_chr5_m0.treeout.gz"))
+phy_rooted_Ch5 <- midpoint.root(phy_Ch5)
+plot(phy_rooted_Ch5)
+
+# Chromosome 6
+phy_Ch6 <- read.tree(gzfile("Oxy_chr6_m0.treeout.gz"))
+phy_rooted_Ch6 <- midpoint.root(phy_Ch6)
+plot(phy_rooted_Ch6)
+
+# Chromosome 7
+phy_Ch7 <- read.tree(gzfile("Oxy_chr7_m0.treeout.gz"))
+phy_rooted_Ch7 <- midpoint.root(phy_Ch7)
+plot(phy_rooted_Ch7)
+
+
+## 4.2 CREATE THE CONSENSUS TREE OF CHROMOSOME 1 TO 7 WITH SUPPORT 
+# AI (ChatGPT) made code
+
+# 4.2.1 Read and root all chromosomes
+trees <- list()
+
+for(i in 1:7){
+  phy <- read.tree(gzfile(paste0("Oxy_chr", i, "_m0.treeout.gz")))
+  phy_rooted <- midpoint.root(phy)
+  trees[[i]] <- phy_rooted
+}
+
+# Majority-rule consensus tree
+cons_tree <- consensus(trees, p = 0.5)
+
+
+# 4.2.2 Node support (nr of splits)
+cons_tree$node.label <- prop.clades(cons_tree, trees)
+
+# Plot the support values
+plot(cons_tree, show.node.label = TRUE) #ger en plot med antal träd som de visas i (alltså mellan 1 till 7 där 7 är alla träd)
+
+# Save plot with support 
+png("Ch1to7_midpointrooted_support_amountoftrees.png", width = 1000, height = 700, res = 150)
+plot(cons_tree, show.node.label = TRUE)  # din Treemix-plot
+dev.off()
+
+
+#4.2.3 Node support (proportion of chromosomes supporting each split)
+cons_tree$node.label <- prop.clades(cons_tree, trees) / length(trees)
+
+# Plot the support values (
+plot(cons_tree, show.node.label = TRUE)
+
+
+# 4.2.4 Node support (percent)
+cons_tree$node.label <- round(100 * prop.clades(cons_tree, trees) / length(trees), 1)
+
+#Plot the support values
+plot(cons_tree, show.node.label = TRUE)
+
+# Save plot with support
+png("Ch1to7_midpointrooted_support_percent.png", width = 1000, height = 700, res = 150)
+plot(cons_tree, show.node.label = TRUE)  # din Treemix-plot
+dev.off()
+
+# If all trees share the split it will be 100%.
+
+
+#------------------------------------------------------------------------------#
+## 5. COMPARE THE REFERENCE TREE TO THE OTHER TREES WITH ROBINSON-FOULDS DISTANCE ####
+
+# Read in all chromosomes (treeout.gz)
+tree1 <- read.tree("Oxy_chr1_m0.treeout.gz")
+tree2 <- read.tree("Oxy_chr2_m0.treeout.gz")
+tree3 <- read.tree("Oxy_chr3_m0.treeout.gz")
+tree4 <- read.tree("Oxy_chr4_m0.treeout.gz")
+tree5 <- read.tree("Oxy_chr5_m0.treeout.gz")
+tree6 <- read.tree("Oxy_chr6_m0.treeout.gz")
+tree7 <- read.tree("Oxy_chr7_m0.treeout.gz")
+
+# Create a reference tree 
+ref<-tree7 
+
+# List the trees which will be compared with the reference tree
+trees <- list(tree1, tree2, tree3, tree4, tree5, tree6)
+
+# Robinson-Foulds to referens
+TreeDistance(ref, trees)
+
+# High Robinson-Foulds = Unstable, Unsure topology. Low Robinson-Foulds = Stable, similar to reference
+
+
+# Mean of distances
+values <- c(0.1032558, 0.1032558,0.0000000, 0.1032558, 0.1032558, 0.2065116) #based on the values gained above
+mean(values)
+
+
+#------------------------------------------------------------------------------#
+## 6. SAVE FIGURES ####
+# Use AI (ChatGPT) made code
+
+png("testfile3.png", width = 1000, height = 700, res = 150)
+plot_tree("Oxy_chr1_m0")  # The treemix plot
+dev.off()
+
+
+#------------------------------------------------------------------------------#
+
+
+########################################################
+######### FOR ACCESSORY/CORE GENES #####################
+
+## 7. FIND THE NUMBER OF MIGRATION EDGES NEEDED TO EXPLAIN THE DATA OF THE ACCESSSORY/CORE ENRICHED REGIONS ####
+# By using code from github by darencard https://github.com/darencard/RADpipe/blob/master/treemixVarianceExplained.R
+# Remade with AI (ChatGPT) to be able to run in R and loop
+
+
+## 7.1 FIND THE BEST NUMBER OF MIGRATION EDGES (MAIN CODE)
+
+calcVarExplain <- function(stem){
+  # read in two covariance matrices
+  WHat = read.table(gzfile(paste(stem, ".cov.gz", sep = "")), as.is = T, 
+                    head = T, quote = "", comment.char = "")
+  W = read.table(gzfile(paste(stem, ".modelcov.gz", sep = "")), as.is = T, 
+                 head = T, quote = "", comment.char = "")
+  
+  # set row and column names and order properly
+  names(WHat) = rownames(WHat)
+  names(W) = rownames(W)
+  WHat = WHat[order(names(WHat)), order(names(WHat))]
+  W = W[order(names(W)), order(names(W))]
+  
+  # calculate standard error of covariance matrix
+  se = read.table(gzfile(paste(stem, ".covse.gz", sep = "")), as.is = T, 
+                  head = T, quote = "", comment.char = "")
+  seBar = apply(se, 1, mean)
+  seBar = mean(seBar)
+  
+  # calculate residuals
+  R = WHat - W
+  
+  # set residual lower matrix triangle to NA
+  R[lower.tri(R, diag = TRUE)] <- NA
+  
+  # calculate mean residual across upper matrix triangle
+  RBar = mean(as.matrix(R), na.rm = TRUE)
+  
+  # set data-estimated W(hat) matrix lower matrix triangle to NA
+  WHat[lower.tri(WHat, diag = TRUE)] <- NA
+  
+  # calculate mean W(hat)
+  WHatBar = mean(as.matrix(WHat), na.rm = TRUE)
+  
+  # calculate numerator of equation 30
+  fNum = sum((R - RBar)^2, na.rm = TRUE)
+  
+  # calculate denominator of equation 30
+  fDen = sum((WHat - WHatBar)^2, na.rm = TRUE)
+  
+  # calculate f
+  f = 1 - (fNum/fDen)
+  
+  outList = list("StdErr" = seBar, "VarExplain" = f)
+  return(outList)
+}
+
+
+# Loop for all files
+
+results_df <- data.frame()
+
+
+for (i in 0:50) {
+  for (m in 0:9) {
+    stem <- paste0("Oxy_accessory_", i, "_m", m)
+    
+    # script crashes if file do not exist
+    if (file.exists(paste0(stem, ".cov.gz"))) {
+      
+      cat("Running:", stem, "\n")  # visar progress
+      
+      out <- calcVarExplain(stem)
+      
+      results_df <- rbind(results_df, data.frame(
+        file = stem,
+        XX = i,
+        m = m,
+        StdErr = out$StdErr,
+        VarExplain = out$VarExplain
+      ))
+    }
+  }
+}
+
+## 7.2 SAVE ALL RESULTS AS A CSV FILE
+
+write.csv(results_df, "VarExplain_AccessoryWGreenland_results.csv", row.names = FALSE)
+
+
+## 7.3 CALCULATE STANDARD DEVIATION AND MEAN PER M
+# Using AI (ChatGPT) made code
+
+summary_df <- aggregate(VarExplain ~ m, results_df, function(x) {
+  c(mean = mean(x), sd = sd(x))
+})
+
+# Save standardeviation and mean as a CSV file
+write.csv(summary_df, "VarExplain_summaryAccessoryWGreenland_by_m.csv", row.names = FALSE)
+
+
+#------------------------------------------------------------------------------#
+## 8. PLOT ALL ITERATIONS AND M VALUES FOR THE ACCESSORY AND CHROMOSOME TREES ####
+# Code from Cassandra Elphinstone
+
+# Folder to save plots
+plot_dir <- "TreeMix_plots"
+if (!dir.exists(plot_dir)) dir.create(plot_dir)
+
+# Folder containing TreeMix outputs
+output_dir <- "/Users/sofie/Documents/Göteborgs universitet/Master/Masterarbete/R/Master_RProject"
+
+# Categories and m values
+categories <- c("core", "accessory")
+m_values <- 0:9
+
+# Get all treemix files in folder
+get_files <- function(category, m) {
+  # Pattern to match all TreeMix output files for this category and m
+  pattern <- paste0("Oxy_", category, "_([0-9]+)_m", m,"\\.(cov|covse|edges|modelcov|treeout|vertices|llik)\\.gz$")
+  
+  # List matching files
+  files <- list.files(output_dir, pattern=pattern, full.names=TRUE)
+  
+  if(length(files) == 0) return(character(0))
+  
+  # Extract the common prefix by removing known suffixes
+  prefixes <- sub("\\.(cov|covse|edges|modelcov|treeout|vertices)\\.gz$", "", basename(files))
+  
+  # Convert to numeric i-values for sorting
+  i_vals <- as.numeric(sub(paste0(".*_([0-9]+)_m", m), "\\1", prefixes))
+  
+  # Sort by i
+  prefixes <- prefixes[order(i_vals)]
+  
+  # Keep unique prefixes only
+  unique(prefixes)
+}
+get_files("core", 0)
+
+# Loop over categories and m values
+for (cat in categories) {
+  for (m in m_values) {
+    cat("Plotting category =", cat, "m =", m, "\n")
+    
+    prefixes <- get_files(cat, m)  # get common prefixes only
+    print(prefixes)
+    
+    if (length(prefixes) == 0) {
+      warning(paste("No files found for category", cat, "and m =", m))
+      next
+    }
+    
+    n_trees <- length(prefixes)
+    plots_per_page <- 6  # number of plots per page (2 cols x 3 rows)
+    n_pages <- ceiling(n_trees / plots_per_page)
+    
+    # --- Overlay Trees ---
+    pdf(file.path(plot_dir, paste0("TreeMix_overlay_", cat, "_m", m, ".pdf")),
+        width=14, height=8)  # landscape
+    for (page in 1:n_pages) {
+      start <- (page-1)*plots_per_page + 1
+      end <- min(page*plots_per_page, n_trees)
+      page_prefixes <- prefixes[start:end]
+      
+      n_page_plots <- length(page_prefixes)
+      n_col <- 2
+      n_row <- ceiling(n_page_plots / n_col)
+      par(mfrow=c(n_row, n_col), mar=c(2,2,2,2))
+      
+      for (p in page_prefixes) {
+        # Only use prefix; do NOT append .treeout.gz
+        tree_prefix <- file.path(output_dir, p)
+        plot_tree(tree_prefix)
+        title(main=paste("Tree:", basename(tree_prefix)), cex.main=0.8)
+      }
+    }
+    dev.off()
+    
+  }
+}
+
+
+#-------------------------------------------------------------#
+## 9. CALCULATE HOW COMMON THE PATTERNS OF MIGRATION IS OUT OF THE 51 ITERATIONS ####
+# AI (ChatGPT) made code
+
+## 9.1 FOR EACH TYPE OF GENE (accessory/core) AND ROOTING (fixed/West Greenland as outgroup) FIND THE MOST COMMON PATTERN OF MIGRATION EDGES
+# 9.1.1 FIXED ACCESSORY
+files <- list.files(
+  path = "/Users/sofie/Documents/Göteborgs universitet/Master/Masterarbete/R/Master_RProject",
+  pattern = "Oxy_accessory_fixedtree_.*_m3\\.edges\\.gz$",
+  full.names = TRUE
+)
+
+# Extract migration edges for each run
+get_mig_edges <- function(file) {
+  df <- read.table(file, stringsAsFactors = FALSE)
+  
+  # Keep only migration edges
+  mig <- df[df$V5 == "MIG", ]
+  
+  if (nrow(mig) == 0) return("no_migration")
+  
+  # Create a simple string representation
+  edges <- paste(mig$V1, "->", mig$V2)
+  
+  # Optional: include weight (rounded)
+  # edges <- paste(mig$V1, "->", mig$V2, "@", round(mig$V4, 3))
+  
+  # Sort so order doesn't matter
+  edges <- sort(edges)
+  
+  # Collapse into one string per run
+  paste(edges, collapse = ";")
+}
+
+# Apply to all runs
+patterns <- sapply(files, get_mig_edges)
+
+# Count frequencies
+table(patterns) #This gives output with the pattern and the amount of times it is seen
+
+# Extract the most common pattern of migration edges
+tab <- table(patterns)
+best_pattern <- names(which.max(tab))
+best_pattern 
+
+# And in wich iterations the pattern is found
+which(patterns == best_pattern) 
+
+
+# 9.1.2 FIXED CORE
+files <- list.files(
+  path = "/Users/sofie/Documents/Göteborgs universitet/Master/Masterarbete/R/Master_RProject",
+  pattern = "Oxy_core_fixedtree_.*_m4\\.edges\\.gz$",
+  full.names = TRUE
+)
+
+## Extract migration edges for each run
+get_mig_edges <- function(file) {
+  df <- read.table(file, stringsAsFactors = FALSE)
+  
+  # Keep only migration edges
+  mig <- df[df$V5 == "MIG", ]
+  
+  if (nrow(mig) == 0) return("no_migration")
+  
+  # Create a simple string representation
+  edges <- paste(mig$V1, "->", mig$V2)
+  
+  # Optional: include weight (rounded)
+  # edges <- paste(mig$V1, "->", mig$V2, "@", round(mig$V4, 3))
+  
+  # Sort so order doesn't matter
+  edges <- sort(edges)
+  
+  # Collapse into one string per run
+  paste(edges, collapse = ";")
+}
+
+# Apply to all runs
+patterns <- sapply(files, get_mig_edges)
+
+# Count frequencies
+table(patterns) #This gives me output with the pattern and the amount of times it is seen
+
+# Extract most common migration edge pattern
+tab <- table(patterns)
+best_pattern <- names(which.max(tab))
+best_pattern 
+
+# And in wich iterations they occur
+which(patterns == best_pattern) 
+
+
+# 9.1.3 WEST GREENLAND ACCESSORY
+
+files <- list.files(
+  path = "/Users/sofie/Documents/Göteborgs universitet/Master/Masterarbete/R/Master_RProject",
+  pattern = "Oxy_accessory_.*_m2\\.edges\\.gz$",
+  full.names = TRUE
+)
+
+# Extract migration edges for each run
+get_mig_edges <- function(file) {
+  df <- read.table(file, stringsAsFactors = FALSE)
+  
+  # Keep only migration edges
+  mig <- df[df$V5 == "MIG", ]
+  
+  if (nrow(mig) == 0) return("no_migration")
+  
+  # Create a simple string representation
+  edges <- paste(mig$V1, "->", mig$V2)
+  
+  # Optional: include weight (rounded)
+  # edges <- paste(mig$V1, "->", mig$V2, "@", round(mig$V4, 3))
+  
+  # Sort so order doesn't matter
+  edges <- sort(edges)
+  
+  # Collapse into one string per run
+  paste(edges, collapse = ";")
+}
+
+# Apply to all runs
+patterns <- sapply(files, get_mig_edges)
+
+# Count frequencies
+table(patterns) #This gives me output with the pattern and the amount of times it is seen
+
+# Extract most common migration edge pattern
+tab <- table(patterns)
+best_pattern <- names(which.max(tab))
+best_pattern 
+
+# And in wich iterations they occur
+which(patterns == best_pattern) 
+
+
+# 9.1.4 WEST GREENLAND CORE
+
+files <- list.files(
+  path = "/Users/sofie/Documents/Göteborgs universitet/Master/Masterarbete/R/Master_RProject",
+  pattern = "Oxy_core_.*_m4\\.edges\\.gz$",
+  full.names = TRUE
+)
+
+## Extract migration edges for each run
+get_mig_edges <- function(file) {
+  df <- read.table(file, stringsAsFactors = FALSE)
+  
+  # Keep only migration edges
+  mig <- df[df$V5 == "MIG", ]
+  
+  if (nrow(mig) == 0) return("no_migration")
+  
+  # Create a simple string representation
+  edges <- paste(mig$V1, "->", mig$V2)
+  
+  # Optional: include weight (rounded)
+  # edges <- paste(mig$V1, "->", mig$V2, "@", round(mig$V4, 3))
+  
+  # Sort so order doesn't matter
+  edges <- sort(edges)
+  
+  # Collapse into one string per run
+  paste(edges, collapse = ";")
+}
+
+# Apply to all runs
+patterns <- sapply(files, get_mig_edges)
+
+# Count frequencies
+table(patterns) #This gives me output with the pattern and the amount of times it is seen
+
+# Extract most common pattern of migration edges
+tab <- table(patterns)
+best_pattern <- names(which.max(tab))
+best_pattern 
+
+which(patterns == best_pattern) 
+
+## 9.2 VISUALISE THE MOST COMMON MIGRATION EDGE PATTERNS AND SAVE
+# AI (ChatGPT) made code
+
+# Fixed accessory
+png("Accessory_Fixed_1_m3.png", width = 1000, height = 700, res = 150)
+plot_tree("Oxy_accessory_fixedtree_1_m3")  # din Treemix-plot
+dev.off()
+
+# Fixed Core
+png("Core_Fixed_1_m4.png", width = 1000, height = 700, res = 150)
+plot_tree("Oxy_core_fixedtree_1_m4")  # din Treemix-plot
+dev.off()
+
+# West Greenland Accessory
+png("Accessory_WGreen_31_m2.png", width = 1000, height = 700, res = 150)
+plot_tree("Oxy_accessory_31_m2")  # din Treemix-plot
+dev.off()
+
+# West Greenland Core
+png("Core_WGreen_1_m4.png", width = 1000, height = 700, res = 150)
+plot_tree("Oxy_core_1_m4")  # din Treemix-plot
+dev.off()
+
+
+#------------------------------------------------------------------------------#
+# 10. COMPARE BETWEEN ITERATIONS (FOR ONE M VALUE) WITH ROBINSON-FOULDS
+# For Accessory/Core, Fixed/WGreenland
+# AI (ChatGPT) made code
+# Unrootes rooted trees and compare those unrooted trees 
+
+#library(ape)
+
+## 10.1 ACCESSORY FIXED
+# Filter for the right files
+filesAF <- list.files(pattern="treeout.gz")
+
+filesAF <- filesAF[grepl("accessory", filesAF)]
+filesAF <- filesAF[grepl("fixedtree", filesAF)]
+filesAF <- filesAF[grepl("m0", filesAF)]
+
+print(filesAF) # Check so all files are there
+
+# Read in the trees
+treesAF <- lapply(filesAF, function(f) {
+  read.tree(gzfile(f))
+})
+
+# Create an empty matrix
+nAF <- length(treesAF)
+rf_mat_AF <- matrix(0, nAF, nAF)
+
+# This test does does not work for rooted trees, so they have to be unrooted
+# Unroot
+treesAF_unrooted <- lapply(treesAF, unroot)
+
+# Loopa for all pairs
+for(i in 1:(nAF-1)){
+  for(j in (i+1):nAF){
+    rf_mat_AF[i,j] <- dist.topo(treesAF_unrooted[[i]], treesAF_unrooted[[j]])
+  }
+}
+
+#Save
+#write.csv(rf_mat_AF, "Robinsonfould_Accessory_Fixed.csv")
+# = indicates that they are the same
+
+
+## 10.2 CORE FIXED 
+# This follows the same workflow as above, but for Fixed Core
+
+filesCF <- list.files(pattern="treeout.gz")
+
+filesCF <- filesCF[grepl("core", filesCF)]
+filesCF <- filesCF[grepl("fixedtree", filesCF)]
+filesCF <- filesCF[grepl("m0", filesCF)]
+
+print(filesCF) 
+
+
+treesCF <- lapply(filesCF, function(f) {
+  read.tree(gzfile(f))
+})
+
+
+nCF <- length(treesCF)
+rf_mat_CF <- matrix(0, nCF, nCF)
+
+# Unroot
+treesCF_unrooted <- lapply(treesCF, unroot)
+
+# Loop
+for(i in 1:(nCF-1)){
+  for(j in (i+1):nCF){
+    rf_mat_CF[i,j] <- dist.topo(treesCF_unrooted[[i]], treesCF_unrooted[[j]])
+  }
+}
+
+# Save
+write.csv(rf_mat_CF, "Robinsonfould_Core_Fixed.csv")
+
+
+## 10.3 ACCESSORY WEST GREENLAND ROOT
+# This follows the same workflow as above, but for outgroup accessory
+
+filesAG <- list.files(pattern="treeout.gz")
+
+filesAG <- filesAG[grepl("accessory", filesAG)]
+filesAG <- filesAG[grepl("fixedtree", filesAG)]
+filesAG <- filesAG[grepl("m0", filesAG)]
+
+print(filesAG) 
+
+treesAG <- lapply(filesAG, function(f) {
+  read.tree(gzfile(f))
+})
+
+nAG <- length(treesAG)
+rf_mat_AG <- matrix(0, nAG, nAG)
+
+# Unroot
+treesAG_unrooted <- lapply(treesAG, unroot)
+
+# Loop
+for(i in 1:(nAG-1)){
+  for(j in (i+1):nAG){
+    rf_mat_AG[i,j] <- dist.topo(treesAG_unrooted[[i]], treesAG_unrooted[[j]])
+  }
+}
+
+# Save
+write.csv(rf_mat_AG, "Robinsonfould_Accessory_WGreenland.csv")
+
+
+## 10.4 CORE WEST GREENLAND ROOT
+# This follows the same workflow as above, but for outgroup core
+
+filesCG <- list.files(pattern="treeout.gz")
+
+filesCG <- filesCG[grepl("accessory", filesCG)]
+filesCG <- filesCG[grepl("fixedtree", filesCG)]
+filesCG <- filesCG[grepl("m0", filesCG)]
+
+print(filesCG)
+
+treesCG <- lapply(filesCG, function(f) {
+  read.tree(gzfile(f))
+})
+
+nCG <- length(treesCG)
+rf_mat_CG <- matrix(0, nCG, nCG)
+
+treesCG_unrooted <- lapply(treesCG, unroot)
+
+for(i in 1:(nCG-1)){
+  for(j in (i+1):nCG){
+    rf_mat_CG[i,j] <- dist.topo(treesCG_unrooted[[i]], treesCG_unrooted[[j]])
+  }
+}
+
+# Save
+write.csv(rf_mat_CG, "Robinsonfould_Core_WGreenland.csv")
+
+
+#------------------------------------------------------------------------------#
+
+## 11. COMPARE TREE TOPOLOGIES (EXCLUDING MIGRATION EDGES) BETWEEN MOST COMMON PATTENRS (from above; point 7) #### 
+# WITH ROBINSON-FOULDS DISTANCe
+# AI (ChatGPT) made code
+
+# Load packages
+#library(ape)
+#library(phangorn)
+
+# 11.1 FOR EACH ROOT CALCULATE ROBINSON FOULDS- AND NORMALIZED ROBINSON FOULDS DISTANCES
+# 11.1.1 West Greenland rooted
+
+# read the Nexus trees (treeout.gz)
+core_tree <- read.tree(gzfile("Oxy_core_1_m4.treeout.gz"))
+acc_tree  <- read.tree(gzfile("Oxy_accessory_31_m2.treeout.gz"))
+
+# Calculate Robinson-Foulds distance
+RF.dist(core_tree, acc_tree, rooted = TRUE)
+
+# Calculate normalized Robinson-Foulds distance
+RF.dist(core_tree, acc_tree, rooted = TRUE, normalize = TRUE) # 0 means identical and 1 completely different
+
+
+# 11.1.2 Fixed (Midpoint rooted)
+core_fixed_tree <- read.tree(gzfile("Oxy_core_fixedtree_1_m4.treeout.gz"))
+acc_fixed_tree  <- read.tree(gzfile("Oxy_accessory_fixedtree_1_m3.treeout.gz"))
+
+# Calculate Robinson-Foulds distance
+RF.dist(core_fixed_tree, acc_fixed_tree, rooted = TRUE)
+
+# Calculate normalized Robinson-Foulds distance
+RF.dist(core_fixed_tree, acc_fixed_tree, rooted = TRUE, normalize = TRUE)
+
+
+# 11.2 COMPARE TOPOLOGIES BETWEEN ITERATIONS
+# This is to compare within each gene type (core/accessory) and rooting (fixed,midpoint rooted/West Greenland)
+# It will be used to see if there is more differens between the iterations, then between core and accessory
+# It is made to see if the difference between core and accessory is bigger then expected (the "natural" variation)
+# Rooted trees are compared
+
+# For fixed accessory m=3
+# Read in all trees 
+files <- list.files(
+  path = "/Users/sofie/Documents/Göteborgs universitet/Master/Masterarbete/R/Master_RProject",
+  pattern = "Oxy_accessory_fixedtree_.*_m3\\.treeout\\.gz$",
+  full.names = TRUE
+)
+
+# Read trees
+trees <- lapply(files, function(f) {
+  tree_text <- readLines(gzfile(f), n = 1)
+  read.tree(text = tree_text)
+})
+
+# Pairwise Robinson-Foulds distance comparison between all iterations
+n <- length(trees)
+
+rf_values <- c()
+nrf_values <- c()
+
+for(i in 1:(n-1)) {
+  for(j in (i+1):n) {
+    
+    rf <- RF.dist(trees[[i]], trees[[j]], rooted = TRUE)
+    
+    nrf <- RF.dist(trees[[i]], trees[[j]],
+                   rooted = TRUE,
+                   normalize = TRUE)
+    
+    rf_values <- c(rf_values, rf)
+    nrf_values <- c(nrf_values, nrf)
+  }
+}
+
+# Summary statistics
+mean(rf_values) # Robinson-Foulds distance
+mean(nrf_values) #Normalised Robinson-Foulds distance
+
+summary(rf_values)
+summary(nrf_values)
+
+
+#------------------------------------------------------------------------#
+## 12. COMPARE MIGRATION EDGES BETWEEN THE TREES ####
+# Based on the trees with nr of migration edges best explaining the data
+# AI (ChatGPT) made code
+
+
+# 12.1 BETWEEN CORE AND ACCESSORY
+# Extract the migration edges from the TreeMix output
+get_edges <- function(file) {
+  
+  tree_text <- readLines(gzfile(file), n = 1)
+  tree <- read.tree(text = tree_text)
+  
+  #  ".edges.gz" are migration edges
+  stop("Use .edges.gz files instead of treeout for migration edges")
+}
+
+# Read migration edges
+read_edges <- function(file) {
+  
+  df <- read.table(gzfile(file), stringsAsFactors = FALSE)
+  
+  mig <- df[df$V5 == "MIG", ]
+  
+  edges <- paste(mig$V1, "->", mig$V2)
+  
+  sort(edges)
+}
+
+# Compare core vs accessory
+read_edges <- function(file) {
+  
+  df <- read.table(gzfile(file), stringsAsFactors = FALSE)
+  
+  mig <- df[df$V5 == "MIG", ]
+  
+  edges <- paste(mig$V1, "->", mig$V2)
+  
+  sort(edges)
+}
+
+# The trees I want to compare
+core_files <- "Oxy_core_fixedtree_1_m4.edges.gz" # fixed (midpointrooted) core m=4
+acc_files <- "Oxy_accessory_fixedtree_1_m3.edges.gz" # fixed accessory m=3
+
+core_edges <- read_edges(core_files[1]) 
+acc_edges  <- read_edges(acc_files[1])
+
+# Compare edges in core vs accessory
+shared <- intersect(core_edges, acc_edges)
+length(shared) # 0 = No shared edges
+
+# Accessory and core specific patterns in the selected trees
+setdiff(core_edges, acc_edges)
+
+setdiff(acc_edges, core_edges)
+
+# 12.2 COMPARE BETWEEN ROOTINGS
+# This is to see if there is similarity between the two roots, for core respectively accessory.
+fixed_files <- "Oxy_accessory_fixedtree_1_m3.edges.gz" #switch to the tree used
+wgreenland_files2 <- "Oxy_accessory_31_m2.edges.gz"
+
+fixed_edges <- read_edges(fixed_files[1]) 
+wgreenland_edges  <- read_edges(wgreenland_files[1])
+
+# Compare edges fixed vs West Greenland rooted
+shared2 <- intersect(fixed_edges, wgreenland_edges)
+length(shared2)
+
