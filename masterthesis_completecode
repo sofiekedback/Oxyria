@@ -67,6 +67,7 @@ for(edge in 0:5){
 ## 2. FIND THE NUMBER OF MIGRATION EDGES NEEDED TO EXPLAIN THE DATA OF THE CHROMOSOMES ####
 # By using code from github by darencard https://github.com/darencard/RADpipe/blob/master/treemixVarianceExplained.R
 # Remade with AI (ChatGPT) to be able to run in R
+# OBS not included in final thesis
 
 # Calculate the standard error in covariance matric and "variance of relatedness between populations explained by the model" 
 #args <- commandArgs(TRUE) # This only works in eg. powershell, so I changed to following
