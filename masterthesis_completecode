@@ -5,9 +5,10 @@
 
 
 ## 0. ESSENTIALS FOR REST OF CODE ####
-setwd("/Users/sofie/Documents/Göteborgs universitet/Master/Masterarbete/R/Master_RProject")
+#set working directoru
+setwd("/Users/sofie/Documents/Göteborgs universitet/Master/Masterarbete/R/Master_RProject") 
 
-# Download accordning to TreeMix manual
+# Download "plotting_funcs.R" accordning to TreeMix manual
 source("/Users/sofie/Documents/Göteborgs universitet/Master/Masterarbete/TreeMix/treemix-1.13/src/plotting_funcs.R")
 
 # All packages used
@@ -25,6 +26,7 @@ library(phytools)
 
 ## 1. VISUALISE UNROOTED PHYLOGENIES ####
 ## 1.1.1 VISUALISE TREES FROM TREEMIX OUTPUT ACCORDING TO TREEMIX MANUAL
+# OBS not included in final thesis
 
 # Plot the chromosome tree (chromosome 1, m=0)
 plot_tree("Oxy_chr1_m0") # change name depending on chromosome and number of migration edges
@@ -34,11 +36,13 @@ plot_tree("Oxy_accessory_fixedtree_0_m0")
 
 
 ## 1.1.2 CREATE RESIDUAL PLOTS BASED ON THE TREEMIX MANUAL
+# OBS Not used for the final thesis
 
 plot_resid("Oxy_chr7_m5", "poporder.txt") # poporder.txt" is a text document with population names
 
 
 ## 1.2 ALTERNATIVE METHOD FROM THE TREEMIX WEBPAGE https://speciationgenomics.github.io/Treemix/
+#OBS not used for the final thesis
 
 #Prefix for the chromosome
 prefix="Oxy_chr1"
@@ -222,6 +226,7 @@ plot(phy_rooted_Ch7)
 
 ## 4.2 CREATE THE CONSENSUS TREE OF CHROMOSOME 1 TO 7 WITH SUPPORT 
 # AI (ChatGPT) made code
+# OBS not used for the final thesis
 
 # 4.2.1 Read and root all chromosomes
 trees <- list()
@@ -271,6 +276,7 @@ dev.off()
 
 #------------------------------------------------------------------------------#
 ## 5. COMPARE THE REFERENCE TREE TO THE OTHER TREES WITH ROBINSON-FOULDS DISTANCE ####
+# OBS not used for the final thesis
 
 # Read in all chromosomes (treeout.gz)
 tree1 <- read.tree("Oxy_chr1_m0.treeout.gz")
@@ -414,6 +420,7 @@ write.csv(summary_df, "VarExplain_summaryAccessoryWGreenland_by_m.csv", row.name
 #------------------------------------------------------------------------------#
 ## 8. PLOT ALL ITERATIONS AND M VALUES FOR THE ACCESSORY AND CHROMOSOME TREES ####
 # Code from Cassandra Elphinstone
+# OBS not included in the final thesis
 
 # Folder to save plots
 plot_dir <- "TreeMix_plots"
@@ -587,6 +594,7 @@ which(patterns == best_pattern)
 
 
 # 9.1.3 WEST GREENLAND ACCESSORY
+# OBS not included in final thesis
 
 files <- list.files(
   path = "/Users/sofie/Documents/Göteborgs universitet/Master/Masterarbete/R/Master_RProject",
@@ -632,6 +640,7 @@ which(patterns == best_pattern)
 
 
 # 9.1.4 WEST GREENLAND CORE
+# OBS not included in final thesis
 
 files <- list.files(
   path = "/Users/sofie/Documents/Göteborgs universitet/Master/Masterarbete/R/Master_RProject",
@@ -688,11 +697,13 @@ plot_tree("Oxy_core_fixedtree_1_m4")  # din Treemix-plot
 dev.off()
 
 # West Greenland Accessory
+# OBS not included in fila thesis
 png("Accessory_WGreen_31_m2.png", width = 1000, height = 700, res = 150)
 plot_tree("Oxy_accessory_31_m2")  # din Treemix-plot
 dev.off()
 
 # West Greenland Core
+# OBS not included in final thesis
 png("Core_WGreen_1_m4.png", width = 1000, height = 700, res = 150)
 plot_tree("Oxy_core_1_m4")  # din Treemix-plot
 dev.off()
@@ -777,6 +788,7 @@ write.csv(rf_mat_CF, "Robinsonfould_Core_Fixed.csv")
 
 ## 10.3 ACCESSORY WEST GREENLAND ROOT
 # This follows the same workflow as above, but for outgroup accessory
+# OBS not included in the final thesis
 
 filesAG <- list.files(pattern="treeout.gz")
 
@@ -809,6 +821,7 @@ write.csv(rf_mat_AG, "Robinsonfould_Accessory_WGreenland.csv")
 
 ## 10.4 CORE WEST GREENLAND ROOT
 # This follows the same workflow as above, but for outgroup core
+# OBS not included in the final thesis
 
 filesCG <- list.files(pattern="treeout.gz")
 
@@ -849,6 +862,7 @@ write.csv(rf_mat_CG, "Robinsonfould_Core_WGreenland.csv")
 
 # 11.1 FOR EACH ROOT CALCULATE ROBINSON FOULDS- AND NORMALIZED ROBINSON FOULDS DISTANCES
 # 11.1.1 West Greenland rooted
+# OBS not used for the final thesis
 
 # read the Nexus trees (treeout.gz)
 core_tree <- read.tree(gzfile("Oxy_core_1_m4.treeout.gz"))
@@ -978,7 +992,9 @@ setdiff(core_edges, acc_edges)
 setdiff(acc_edges, core_edges)
 
 # 12.2 COMPARE BETWEEN ROOTINGS
-# This is to see if there is similarity between the two roots, for core respectively accessory.
+# This is to see if there is similarity between the two roots, for core respectively accessory. For confidence.
+#OBS not included in the final thesis
+
 fixed_files <- "Oxy_accessory_fixedtree_1_m3.edges.gz" #switch to the tree used
 wgreenland_files2 <- "Oxy_accessory_31_m2.edges.gz"
 
