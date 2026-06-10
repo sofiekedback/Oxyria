@@ -163,6 +163,7 @@ plot(phy_rooted)
 
 
 # Save the midpoint rooted tree file
+# Code by Martin R. Smith, Loading phylogenetic trees into R, https://cran.r-project.org/web/packages/TreeTools/vignettes/load-trees.html
 #library(ape)
 
 #In Newick format
